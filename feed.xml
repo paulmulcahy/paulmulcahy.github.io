@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+<title>Build Log</title>
+<id>urn:md2blog:Build%20Log</id>
+
+<author>
+<name>Build Log</name>
+</author>
+<updated>2025-11-01T02:45:54.730Z</updated>
+
+<entry>
+<title>Healthy vs Non-Healthy Garbage Collection Behavior In The JVM</title>
+<id>urn:md2blog:Build%20Log:Healthy%20vs%20Non-Healthy%20Garbage%20Collection%20Behavior%20In%20The%20JVM</id>
+<link rel="alternate" href="posts/jvm/healthy-vs-non-healthy-garbage-collection-behavior-in-the-jvm.html"/>
+<updated>2025-10-28T00:00:00.000Z</updated>
+<summary type="text">What defines healthy versus unhealthy GC behavior, how to interpret heap usage patterns, and how to correct GC issues before they impact performance?</summary>
+<content type="html">&lt;h1 id=&quot;introduction&quot;&gt;Introduction&lt;/h1&gt;
+&lt;p&gt;Ever watched your Java service slow to a crawl for no clear reason?&lt;br/&gt;Often, the culprit isn’t your code — it’s your garbage collector gasping for air.&lt;/p&gt;
+&lt;p&gt;Garbage collection (GC) is the JVM’s built-in memory management mechanism, automatically reclaiming space from unreachable objects so you can focus on writing logic instead of worrying about leaks.&lt;br/&gt;But GC activity is more than just a background process — it’s like your application’s &lt;strong&gt;heartbeat&lt;/strong&gt;. Smooth, predictable GC behavior signals healthy memory use, while erratic or frequent GC events often reveal deeper performance issues: leaks, excessive allocation, or poor tuning.&lt;/p&gt;
+&lt;p&gt;In this post, we’ll explore what defines healthy vs. unhealthy GC behavior, how to interpret heap usage patterns, and how to correct GC issues before they impact performance.&lt;/p&gt;
+&lt;hr/&gt;
+&lt;h1 id=&quot;what-does-healthy-gc-behavior-look-like&quot;&gt;What does &amp;quot;healthy&amp;quot; GC behavior look like&lt;/h1&gt;
+&lt;p&gt;When the GC is functioning optimally, you&amp;#39;ll see a stable rhythm of memory allocation and reclamation.&lt;/p&gt;
+&lt;h2 id=&quot;typical-pattern&quot;&gt;Typical Pattern&lt;/h2&gt;
+&lt;ol&gt;
+&lt;li&gt;The heap gradual fills as the application allocates objects.&lt;/li&gt;
+&lt;li&gt;A GC event (young or full) reclaims unused memory.&lt;/li&gt;
+&lt;li&gt;Heap usage drops, and the cycle repeats predictably.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;This creates the characteristic &lt;strong&gt;&amp;quot;saw-tooth&amp;quot; pattern&lt;/strong&gt; in heap usage charts - often a sign of a healthy application.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&amp;quot;Heap usage will keep rising; once a Full Garbage collection ... occurs memory utilization drops all the way to the bottom ... It indicates that the application is in a healthy state &amp;amp; not suffering from any sort of memory problems.&amp;quot;
+&lt;a href=&quot;https://dzone.com/articles/interesting-garbage-collection-patterns&quot;&gt;DZone: Interesting Garbage Collection Patterns&lt;/a&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2 id=&quot;traits-of-a-healthy-gc&quot;&gt;Traits of a Healthy GC&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;GC events are infrequent and quick.&lt;/li&gt;
+&lt;li&gt;Application throughput remains high.&lt;/li&gt;
+&lt;li&gt;Post-GC heap usage (the &amp;quot;baseline&amp;quot;) stays consistent over time.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;Insert GC=&quot;&quot; Healthy=&quot;&quot; Image=&quot;&quot; Here=&quot;&quot;&gt;
+
+&lt;p&gt;&lt;strong&gt;Note:&lt;/strong&gt; With modern concurrent collectors like &lt;strong&gt;G1GC&lt;/strong&gt;, &lt;strong&gt;ZGV&lt;/strong&gt;, and &lt;strong&gt;Shenandoah&lt;/strong&gt;, the saw-tooth pattern may appear smoother since these collectors perform most work concurrently, reducing large visibility drops.&lt;/p&gt;
+&lt;hr/&gt;
+&lt;h1 id=&quot;what-does-unhealthy-gc-behavior-look-like&quot;&gt;What does &amp;quot;Unhealthy&amp;quot; GC behavior Look Like?&lt;/h1&gt;
+&lt;p&gt;Unhealthy GC behavior indicates that your application or JVM configuration is struggling to manage memory efficiently.&lt;/p&gt;
+&lt;h2 id=&quot;common-symptoms&quot;&gt;Common Symptoms&lt;/h2&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Symptom&lt;/th&gt;
+&lt;th&gt;Description&lt;/th&gt;
+&lt;th&gt;Likely Causes&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;&lt;tr&gt;
+&lt;td&gt;Frequent Full GCs&lt;/td&gt;
+&lt;td&gt;Full GCs happen seconds apart, consuming CPU and causing pauses&lt;/td&gt;
+&lt;td&gt;Heap to small, excessive allocation, old-gen promotion pressure.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Rising Heap Baseline&lt;/td&gt;
+&lt;td&gt;Memory after GC keeps growing after GC.&lt;/td&gt;
+&lt;td&gt;Objects are still strongly referenced.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;GC Thrashing&lt;/td&gt;
+&lt;td&gt;JVM spends more time in GC than running the app.&lt;/td&gt;
+&lt;td&gt;Small heap, too amny short-lived objects, mis-tuned GC parameters&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Promotion Failures / OOM&lt;/td&gt;
+&lt;td&gt;Objects move prematurely to old generation, eventually OOM&lt;/td&gt;
+&lt;td&gt;Survivor space exhaustian, high allocation churn.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;&lt;/table&gt;
+&lt;h2 id=&quot;visual-examples-healthy-vs-unhealthy-patterns&quot;&gt;Visual Examples: Healthy vs Unhealthy Patterns&lt;/h2&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Pattern&lt;/th&gt;
+&lt;th&gt;Description&lt;/th&gt;
+&lt;th&gt;Typical Cause&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;&lt;tr&gt;
+&lt;td&gt;&lt;Insert Healthly=&quot;&quot; JVM=&quot;&quot; Image=&quot;&quot;&gt; Healthy Saw-Tooth
+&lt;td&gt;Heap rises and falls predictably with GC cycles&lt;/td&gt;
+&lt;td&gt;Balanced allocation and reclaimation&lt;/td&gt;
+
+&lt;tr&gt;
+&lt;td&gt;&lt;Insert Rising=&quot;&quot; Baseline=&quot;&quot; Image=&quot;&quot;&gt; Rising Baseline
+&lt;td&gt;Each GC leaves more memory retained&lt;/td&gt;
+&lt;td&gt;Memory leak or poor caching logic.&lt;/td&gt;
+
+&lt;tr&gt;
+&lt;td&gt;&lt;Insert Flag=&quot;&quot; NoDrop=&quot;&quot; Image=&quot;&quot;&gt; Flag / No Drop
+&lt;td&gt;Heap stays high even after GC&lt;/td&gt;
+&lt;td&gt;Retained strong references.&lt;/td&gt;
+
+&lt;tr&gt;
+&lt;td&gt;&lt;Insert Frequen=&quot;&quot; Spikes=&quot;&quot; Image=&quot;&quot;&gt; Frequent Spikes
+&lt;td&gt;Constant GCs reclaim little memory&lt;/td&gt;
+&lt;td&gt;Heap too small or allocation too fast&lt;/td&gt;
+
+
+&lt;h1 id=&quot;diagnosing-gc-health&quot;&gt;Diagnosing GC Health&lt;/h1&gt;
+&lt;p&gt;Understanding GC health requires monitoring metrics, and log analysis.&lt;/p&gt;
+&lt;h2 id=&quot;gc-logs&quot;&gt;GC Logs&lt;/h2&gt;
+&lt;p&gt;Enables GC logging in modern JVMs:&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-bash&quot;&gt;java -Xlog:gc*:file=gc.log:time,&lt;span class=&quot;hljs-built_in&quot;&gt;uptime&lt;/span&gt;,level,tags MyApp
+&lt;/code&gt;&lt;/pre&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Parameter&lt;/th&gt;
+&lt;th&gt;Description&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;java&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Runs the Java Virtual Machine (JVM).&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;-Xlog:gc*&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Enables detailed logging for all garbage collection events.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;file=gc.log&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Writes logs to a file (&lt;code&gt;gc.log&lt;/code&gt;) for later analysis.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;time&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Includes wall-clock timestamp of each event.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;uptime&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Adds time since JVM startup.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;level&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Includes log severity (info, warning, etc.).&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;tags&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;Includes event tags (gc, heap, pause, etc.).&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;code&gt;MyApp&lt;/code&gt;&lt;/td&gt;
+&lt;td&gt;The Java class containing the &lt;code&gt;main&lt;/code&gt; method to run.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;&lt;/table&gt;
+&lt;h2 id=&quot;monitoring-tools&quot;&gt;Monitoring Tools&lt;/h2&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Tool&lt;/th&gt;
+&lt;th&gt;Description&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;&lt;tr&gt;
+&lt;td&gt;&lt;a href=&quot;https://visualvm.github.io/&quot;&gt;VisualVM&lt;/a&gt;&lt;/td&gt;
+&lt;td&gt;live heap and GC charts&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;a href=&quot;https://wiki.openjdk.org/display/jmc/Main&quot;&gt;Java Mission Control (JMC)&lt;/a&gt;&lt;/td&gt;
+&lt;td&gt;Advanced Profiling And Flight Recordings&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;a href=&quot;https://grafana.com/&quot;&gt;Grafana&lt;/a&gt; &amp;amp; &lt;a href=&quot;https://prometheus.io/docs/introduction/overview/&quot;&gt;Prometheus&lt;/a&gt;&lt;/td&gt;
+&lt;td&gt;Dashboards&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;&lt;/table&gt;
+&lt;h1 id=&quot;key-metrics-to-watch&quot;&gt;Key Metrics to Watch&lt;/h1&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Metric&lt;/th&gt;
+&lt;th&gt;What It Tells You&lt;/th&gt;
+&lt;th&gt;Health Range / Guidance&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;&lt;tr&gt;
+&lt;td&gt;GC Pause Time&lt;/td&gt;
+&lt;td&gt;Duration of stop-the-world events.&lt;/td&gt;
+&lt;td&gt;&amp;lt;200ms for latency specific systems.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;GC Frequency&lt;/td&gt;
+&lt;td&gt;How ofen the GCs occur&lt;/td&gt;
+&lt;td&gt;Should scale with allocation rate, not spike randomly.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Heap after GC&lt;/td&gt;
+&lt;td&gt;Post-collection heap usage.&lt;/td&gt;
+&lt;td&gt;Should stay roughly stable over time.&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Allocation Rate&lt;/td&gt;
+&lt;td&gt;Object creation speed&lt;/td&gt;
+&lt;td&gt;Excessive rates -&amp;gt; rune caching or reuse objects&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;&lt;/table&gt;
+&lt;h1 id=&quot;keeping-your-gc-healthy&quot;&gt;Keeping Your GC Healthy&lt;/h1&gt;
+&lt;h2 id=&quot;right-size-your-heap&quot;&gt;Right-Size Your Heap&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Set &lt;code&gt;-Xms&lt;/code&gt; and &lt;code&gt;-Xmx&lt;/code&gt; to match actual usage.&lt;/li&gt;
+&lt;li&gt;Avoid setting them too small - causes frequent GCs.&lt;/li&gt;
+&lt;li&gt;Avoid excessive heap - delays leak detection.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&quot;pick-the-right-gc-algorithm&quot;&gt;Pick the Right GC Algorithm&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;G1GC (default since JDK 9):&lt;/strong&gt; Balanced throughput and latency.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ZGC / Shenandoah:&lt;/strong&gt; Ultra-low pause times, ideal for large heaps.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Parallel GC:&lt;/strong&gt; Best for batch jobs with high CPU throughput.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&quot;reduce-object-churn&quot;&gt;Reduce Object Churn&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Reuse objects and buffers&lt;/li&gt;
+&lt;li&gt;Use primitive collections (eg. TIntArrayList) to reduce boxing.&lt;/li&gt;
+&lt;li&gt;Avoid temporary object floods (e.g., string concatenation inside loops).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&quot;profile-and-analyze-regularly&quot;&gt;Profile and Analyze Regularly&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;Use memory profiles (JMC, Eclipse MAT) to spot leaks.&lt;/li&gt;
+&lt;li&gt;Investigate any rising heap baselines early.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h1 id=&quot;example-diagnosing-a-leak-via-gc-pattern&quot;&gt;Example: Diagnosing a Leak via GC Pattern&lt;/h1&gt;
+&lt;ol&gt;
+&lt;li&gt;Heap baseline keeps rising every hour.&lt;/li&gt;
+&lt;li&gt;GC logs show increasing &amp;quot;used after GC&amp;quot; values.&lt;/li&gt;
+&lt;li&gt;Heap dump analysis reveals a large ConcurrentHashMap holding cached objects with no eviction policy.&lt;/li&gt;
+&lt;li&gt;Fix -&amp;gt; Add cache expiration -&amp;gt; GC returns to steady saw-tooth-pattern.&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h1 id=&quot;conclusion&quot;&gt;Conclusion&lt;/h1&gt;
+&lt;p&gt;Health garbage collection isn&amp;#39;t about minimizing GC activity.
+It&amp;#39;s about maintaining a predictable, balanced cycle where memory is reclaimed efficiently and the application spends most time doing real work.&lt;/p&gt;
+&lt;p&gt;When GC becomes erratic, too frequent, or too ineffective, it&amp;#39;s a sign to:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Reassess heap sizing and GC algorithm choice.&lt;/li&gt;
+&lt;li&gt;Analyze object allocation patterns.&lt;/li&gt;
+&lt;li&gt;Fix leaks and optimize caching.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;With consistent monitoring and tuning, we can keep the JVM&amp;#39;s &amp;quot;heartbeat&amp;quot; steady - ensuring high throughput and long-term stability.&lt;/p&gt;
+&lt;h2 id=&quot;further-reading&quot;&gt;Further Reading&lt;/h2&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&quot;https://docs.oracle.com/en/java/javase/21/gctuning/introduction-garbage-collection-tuning.html&quot;&gt;Oracle GC Tuning Guide&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://www.datadoghq.com/blog/understanding-java-gc&quot;&gt;Datadog: Understanding Java GC&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://www.papertrail.com/solution/tips/7-problems-to-look-out-for-when-analyzing-garbage-collection-logs/&quot;&gt;Papertrail: 7 GC Log Problems to Look Out For&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://stackoverflow.com/questions/20413321/does-this-memory-usage-pattern-indicate-that-my-java-application-leaks-memory&quot;&gt;StackOverflow: Memory Usage Patterns &amp;amp; Leaks&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&quot;https://stackoverflow.com/questions/61079322/jvm-heap-usage-variation-is-this-graph-normal&quot;&gt;StackOverflow: JVM Heap Usage Variation&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;pre&gt;&lt;code class=&quot;language-yaml&quot;&gt;&lt;span class=&quot;hljs-meta&quot;&gt;---&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;title:&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Healthy&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;vs&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Non-Healthy&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Garbage&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Collection&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Behavior&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;In&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;The&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;JVM&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;description:&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;What&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;defines&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;healthy&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;versus&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;unhealthy&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;GC&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;behavior,&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;how&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;to&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;interpret&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;heap&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;usage&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;patterns,&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;and&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;how&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;to&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;correct&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;GC&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;issues&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;before&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;they&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;impact&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;performance?&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;date:&lt;/span&gt; &lt;span class=&quot;hljs-number&quot;&gt;2025-10-28&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;keywords:&lt;/span&gt; [&lt;span class=&quot;hljs-string&quot;&gt;java&lt;/span&gt;,&lt;span class=&quot;hljs-string&quot;&gt;jvm&lt;/span&gt;]
+&lt;span class=&quot;hljs-meta&quot;&gt;---&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/Insert&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/Insert&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/Insert&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/Insert&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/tbody&gt;&lt;/table&gt;&lt;/Insert&gt;</content>
+</entry>
+</feed>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Healthy vs Non-Healthy Garbage Collection Behavior In The JVM</title>
+<meta name="description" content="What defines healthy versus unhealthy GC behavior, how to interpret heap usage patterns, and how to correct GC issues before they impact performance?" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<link rel="stylesheet" href="../../css/style.css" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Healthy vs Non-Healthy Garbage Collection Behavior In The JVM",
+  "abstract": "What defines healthy versus unhealthy GC behavior, how to interpret heap usage patterns, and how to correct GC issues before they impact performance?",
+  "keywords": "misc",
+  "datePublished": "2025-10-31"
+}
+</script>
+</head>
+<body>
+<header>
+<h1><a href="../../index.html">Build Log</a></h1>
+<p>Tracking the process of building — systems, skills, and ideas that evolve over time.</p>
+
+<nav>
+<strong>Topics:&nbsp;</strong>
+<ul>
+<li><a href="../../posts/misc/index.html">misc</a></li>
+</ul>
+</nav>
+</header>
+<main>
+<article>
+<header>
+<h1><a href="../../posts/misc/first-post.html">Healthy vs Non-Healthy Garbage Collection Behavior In The JVM</a></h1>
+<p><time datetime="2025-10-31">October 31, 2025</time></p>
+</header>
+<h1 id="introduction">Introduction</h1>
+<p>Garbage collection (GC) is a cornerstone of the Java Virtual Machine (JVM) memory management system. 
+It automatically reclaims memory used by objects that are no longer reachable, keeping your application running without manual memory handling.
+But GC activity also acts like a &quot;heartbeat&quot; for your application.
+Smooth, predictable GC behavior signals healthy memory use, while frequent or irregular GC events can reveal performance issues such as leaks, excessive allocation, or poor tuning.
+In this post, I explore what defines healthy versus unhealthy GC behavior, how to interpret heap usage patterns, and how to correct GC issues before they impact performance.</p>
+<h1 id="what-does-healthy-gc-behavior-look-like">What does &quot;healthy&quot; GC behavior look like</h1>
+<p>When the GC is functioning optimally, you&#39;ll see a stable rhythm of memory allocation and reclamation.</p>
+<h2 id="typical-pattern">Typical Pattern</h2>
+<ol>
+<li>The heap gradual fills as the application allocates objects.</li>
+<li>A GC event (young or full) reclaims unused memory.</li>
+<li>Heap usage drops, and the cycle repeats predictably.</li>
+</ol>
+<p>This creates the characteristic &quot;saw-tooth&quot; pattern in heap usage charts - often a sign of a healthy application.</p>
+<p>&quot;Heap usage will keep rising; once a Full Garbage collection ... occurs memory utilization drops all the way to the bottom ... It indicates that the application is in a healthy state &amp; not suffering from any sort of memory problems.&quot; - <a href="https://dzone.com/articles/interesting-garbage-collection-patterns">https://dzone.com/articles/interesting-garbage-collection-patterns</a></p>
+<h2 id="traits-of-a-healthy-gc">Traits of a Healthy GC</h2>
+<ul>
+<li>Update <code>title</code>, <code>description</code>, and <code>footer.text</code> in <code>content/site.json</code> to set the blog title, description, and (optional) footer/copyright notice</li>
+<li>Consider adding a <code>url</code> property to <code>content/site.json</code> (this will make md2blog generate absolute URLs iny our Atom feed)<ul>
+<li>Make sure the URL ends with a <code>/</code></li>
+</ul>
+</li>
+<li>Create directories in <code>content/posts/</code> for each topic, then author posts in those directories<ul>
+<li>Remember that you can add additional keywords to posts:</li>
+</ul>
+</li>
+</ul>
+<pre><code class="language-yaml"><span class="hljs-meta">---</span>
+<span class="hljs-attr">title:</span> <span class="hljs-string">Healthy</span> <span class="hljs-string">vs</span> <span class="hljs-string">Non-Healthy</span> <span class="hljs-string">Garbage</span> <span class="hljs-string">Collection</span> <span class="hljs-string">Behavior</span> <span class="hljs-string">In</span> <span class="hljs-string">The</span> <span class="hljs-string">JVM</span>
+<span class="hljs-attr">description:</span> <span class="hljs-string">What</span> <span class="hljs-string">defines</span> <span class="hljs-string">healthy</span> <span class="hljs-string">versus</span> <span class="hljs-string">unhealthy</span> <span class="hljs-string">GC</span> <span class="hljs-string">behavior,</span> <span class="hljs-string">how</span> <span class="hljs-string">to</span> <span class="hljs-string">interpret</span> <span class="hljs-string">heap</span> <span class="hljs-string">usage</span> <span class="hljs-string">patterns,</span> <span class="hljs-string">and</span> <span class="hljs-string">how</span> <span class="hljs-string">to</span> <span class="hljs-string">correct</span> <span class="hljs-string">GC</span> <span class="hljs-string">issues</span> <span class="hljs-string">before</span> <span class="hljs-string">they</span> <span class="hljs-string">impact</span> <span class="hljs-string">performance?</span>
+<span class="hljs-attr">date:</span> <span class="hljs-number">2025-10-31</span>
+<span class="hljs-attr">keywords:</span> [<span class="hljs-string">java</span>,<span class="hljs-string">jvm</span>]
+<span class="hljs-meta">---</span>
+</code></pre>
+
+<footer>
+<p>&crarr; <a href="../../index.html">Back to home</a></p>
+</footer>
+</article>
+</main>
+<footer>
+<p>All opinions and reflections here are my own and not those of my employer.</p>
+</footer>
+</body>
+</html>
