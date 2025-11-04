@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Kernel-Level Threads vs User-Level Threads (and Why It Matters in Modern Java)</title>
+<meta name="description" content="What is the difference between kernel-level threads and user-level threads?" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<link rel="stylesheet" href="../../css/style.css" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Kernel-Level Threads vs User-Level Threads (and Why It Matters in Modern Java)",
+  "abstract": "What is the difference between kernel-level threads and user-level threads?",
+  "keywords": "concurrency",
+  "datePublished": "2025-11-03"
+}
+</script>
+</head>
+<body>
+<header>
+<h1><a href="../../index.html">Build Log</a></h1>
+<p>Tracking the process of building — systems, skills, and ideas that evolve over time.</p>
+
+<nav>
+<strong>Topics:&nbsp;</strong>
+<ul>
+<li><a href="../../posts/concurrency/index.html">concurrency</a></li>
+</ul>
+</nav>
+</header>
+<main>
+<article>
+<header>
+<h1><a href="../../posts/concurrency/kernel-level-threads-vs-user-level-threads.html">Kernel-Level Threads vs User-Level Threads (and Why It Matters in Modern Java)</a></h1>
+<p><time datetime="2025-11-03">November 3, 2025</time></p>
+</header>
+<h1 id="introduction">Introduction</h1>
+<p>Concurrency is a cornerstone of modern computing. Whether you’re writing a high-performance web server or parallelizing data processing, understanding how threads are managed—both by the operating system and the runtime—helps you design more scalable, efficient systems.</p>
+<p>In Java, this distinction has become even more important with the introduction of Virtual Threads in Project Loom, which effectively reintroduces user-level threading to the JVM world. Let’s explore what that means by comparing kernel-level (platform) threads and user-level threads.</p>
+<hr>
+<h1 id="overview-of-thread-types">Overview of Thread Types</h1>
+<p>Threads allow multiple tasks to execute concurrently within the same process. How these threads are managed depends on the layer of control:</p>
+<ul>
+<li><strong>Kernel-Level (Platform) Threads</strong>: Managed directly by the operating system (OS).</li>
+<li><strong>User-Level Threads</strong>: Managed by a user-space library or runtime, without OS involvement.</li>
+</ul>
+<h1 id="comparison-of-kernel-level-threads-and-user-level-threads">Comparison of Kernel-Level Threads and User-Level Threads</h1>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Platform Threads</th>
+<th>User Threads</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Management</td>
+<td>Managed by the operating system</td>
+<td>A user-space library or runtime</td>
+</tr>
+<tr>
+<td>Mapping</td>
+<td>Each thread in your program corresponds 1:1 to a thread in the OS</td>
+<td>Many user threads multiplexed onto fewer kernel threads</td>
+</tr>
+<tr>
+<td>Parallelism</td>
+<td>True paralleism with OS scheduling</td>
+<td>Cooperative scheduling - often not parallel across cores</td>
+</tr>
+<tr>
+<td>Creation Speed</td>
+<td>Slower, as each thread requires OS resources</td>
+<td>Extremely fast (no OS call needed)</td>
+</tr>
+<tr>
+<td>Resource Usage</td>
+<td>Higher (stack, scheduling overhead)</td>
+<td>Very light</td>
+</tr>
+<tr>
+<td>Blocking Behavior</td>
+<td>Blocking system calls can suspend the entire OS thread</td>
+<td>One blocked user thread does not necessarily block others (depending on runtime design)</td>
+</tr>
+</tbody></table>
+<h1 id="advantages--disadvantages">Advantages / Disadvantages</h1>
+<h2 id="platform-kernel-level-threads">Platform (Kernel-Level) Threads</h2>
+<h3 id="advantages">Advantages</h3>
+<ul>
+<li>True hardware-level parallism</li>
+<li>Direct access to OS scheduling and CPU cores</li>
+</ul>
+<h3 id="disadvantages">Disadvantages</h3>
+<ul>
+<li>Higher overhead to create and switch context</li>
+<li>Limited scalability - thousands of OS threads can quickly exhaust resources</li>
+</ul>
+<h2 id="user-threads">User Threads</h2>
+<h3 id="advantages-1">Advantages</h3>
+<ul>
+<li>Lightweight and quick to create</li>
+<li>Efficient for large numbers of concurrent tasks</li>
+<li>Portable across platforms</li>
+</ul>
+<h3 id="disadvantages-1">Disadvantages</h3>
+<ul>
+<li>Limited parallism - often single-core execution unless runtime manages multiplexing</li>
+<li>Harder to integrate with blocking I/O or system calls</li>
+</ul>
+<h1 id="javas-evolution-from-platform-threads-to-virtual-threads">Java&#39;s Evolution: From Platform Threads to Virtual Threads</h1>
+<p>Historically, Java threads were 1:1 mappings to OS (platform) threads. This meant creating thousands of concurrent tasks (eg, one thread per connection) was inefficient because each thread consumed a large stack and kernel resources.</p>
+<p><strong>Project Loom</strong> (introduced in Java 21) changed that. Virtual threads are user-level threads implemented by the JVM. They&#39;re scheduled by the Java runtime onto a smaller pool of platform threads.</p>
+<p>This gives use the best of both worlds:</p>
+<ul>
+<li>The simplicity of the familiar Thread API</li>
+<li>The scalability of lightweight user threads</li>
+</ul>
+<h1 id="example-virtual-threads-in-action">Example: Virtual Threads in Action</h1>
+<p>Here&#39;s a simple demonstration comparis traditional platform threads and virtual threads.</p>
+<pre><code><span class="hljs-keyword">import</span> java.util.concurrent.Executors;
+<span class="hljs-keyword">import</span> java.util.stream.IntStream;
+
+<span class="hljs-keyword">public</span> <span class="hljs-keyword">class</span> <span class="hljs-title class_">VirtualThreadsDemo</span> {
+    <span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">void</span> <span class="hljs-title function_">main</span><span class="hljs-params">(String[] args)</span> <span class="hljs-keyword">throws</span> Exception {
+        <span class="hljs-keyword">try</span> (<span class="hljs-type">var</span> <span class="hljs-variable">executor</span> <span class="hljs-operator">=</span> Executors.newVirtualThreadPerTaskExecutor()) {
+            IntStream.range(<span class="hljs-number">0</span>, <span class="hljs-number">1000</span>).forEach(i -&gt;
+                executor.submit(() -&gt; {
+                    Thread.sleep(<span class="hljs-number">100</span>); <span class="hljs-comment">// Simulate blocking I/O</span>
+                    System.out.println(<span class="hljs-string">&quot;Task &quot;</span> + i + <span class="hljs-string">&quot; running on &quot;</span> + Thread.currentThread());
+                    <span class="hljs-keyword">return</span> i;
+                })
+            );
+        } <span class="hljs-comment">// Executor closes automatically</span>
+    }
+}
+</code></pre>
+<p>In older Java versions, creating 1000 threads like this would be expensive and could overwhelm the OS.
+With virtual threads, the JVM efficiently schedules them over a small number of kernel threads, giving you massive concurrency with minimal overhead.</p>
+<h1 id="choosing-the-right-threading-model">Choosing the Right Threading Model</h1>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Recommended Approach</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CPU-bound tasks</td>
+<td>Platform (kernel-level) threads</td>
+</tr>
+<tr>
+<td>I/O-bound tasks (many concurrent connections)</td>
+<td>Virtual (user-level) threads</td>
+</tr>
+<tr>
+<td>Fine-grained concurrency, lightweight workloads</td>
+<td>Virtual threads</td>
+</tr>
+<tr>
+<td>Low-Level system access, custom schedulers</td>
+<td>Platform threads</td>
+</tr>
+</tbody></table>
+<h1 id="key-takeaways">Key Takeaways</h1>
+<ul>
+<li><strong>Platform threads</strong> offer true parallelism but come with higher cost.</li>
+<li><strong>User-level threads</strong> (like Java virtual threads) are lightweight and scalable but rely on runtime scheduling.</li>
+<li><strong>Java 21+ bridges the two worlds</strong> by offering virtual threads that behave like normal <code>Threads</code> but scale like coroutines.</li>
+<li>Understanding how these thread models differ empowers us to design applications that are both efficient and maintainable in the era of high-concurrency systems.</li>
+</ul>
+<h1 id="conclusion">Conclusion</h1>
+<p>As a Java developer, mastering concurrency isn&#39;t just about using <code>synchronized</code> or <code>ExecutorService</code>. It&#39;s about understanding what&#39;s happending under the hood - how threads are scheduled, how resources are managed, and how new models like virtual threads reshape our approach to scalability.</p>
+<p>Whether you&#39;re optimizing backend performance or designing frameworks, knowing the difference between kernel-level and user-level threading will help us write code that&#39;s both faster and more future-proof.</p>
+<pre><code class="language-yaml"><span class="hljs-meta">---</span>
+<span class="hljs-attr">title:</span> <span class="hljs-string">Kernel-Level</span> <span class="hljs-string">Threads</span> <span class="hljs-string">vs</span> <span class="hljs-string">User-Level</span> <span class="hljs-string">Threads</span> <span class="hljs-string">(and</span> <span class="hljs-string">Why</span> <span class="hljs-string">It</span> <span class="hljs-string">Matters</span> <span class="hljs-string">in</span> <span class="hljs-string">Modern</span> <span class="hljs-string">Java)</span>
+<span class="hljs-attr">description:</span> <span class="hljs-string">What</span> <span class="hljs-string">is</span> <span class="hljs-string">the</span> <span class="hljs-string">difference</span> <span class="hljs-string">between</span> <span class="hljs-string">kernel-level</span> <span class="hljs-string">threads</span> <span class="hljs-string">and</span> <span class="hljs-string">user-level</span> <span class="hljs-string">threads?</span>
+<span class="hljs-attr">date:</span> <span class="hljs-number">2025-11-03</span>
+<span class="hljs-attr">keywords:</span> [<span class="hljs-string">java</span>,<span class="hljs-string">concurrency</span>]
+<span class="hljs-meta">---</span>
+</code></pre>
+
+<footer>
+<p>&crarr; <a href="../../index.html">Back to home</a></p>
+</footer>
+</article>
+</main>
+<footer>
+<p>All opinions and reflections here are my own and not those of my employer.</p>
+</footer>
+</body>
+</html>

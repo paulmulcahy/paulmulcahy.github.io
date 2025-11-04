@@ -6,8 +6,161 @@
 <author>
 <name>Build Log</name>
 </author>
-<updated>2025-11-01T02:45:54.730Z</updated>
+<updated>2025-11-04T04:34:56.174Z</updated>
 
+<entry>
+<title>Kernel-Level Threads vs User-Level Threads (and Why It Matters in Modern Java)</title>
+<id>urn:md2blog:Build%20Log:Kernel-Level%20Threads%20vs%20User-Level%20Threads%20(and%20Why%20It%20Matters%20in%20Modern%20Java)</id>
+<link rel="alternate" href="posts/concurrency/kernel-level-threads-vs-user-level-threads.html"/>
+<updated>2025-11-03T00:00:00.000Z</updated>
+<summary type="text">What is the difference between kernel-level threads and user-level threads?</summary>
+<content type="html">&lt;h1 id=&quot;introduction&quot;&gt;Introduction&lt;/h1&gt;
+&lt;p&gt;Concurrency is a cornerstone of modern computing. Whether you’re writing a high-performance web server or parallelizing data processing, understanding how threads are managed—both by the operating system and the runtime—helps you design more scalable, efficient systems.&lt;/p&gt;
+&lt;p&gt;In Java, this distinction has become even more important with the introduction of Virtual Threads in Project Loom, which effectively reintroduces user-level threading to the JVM world. Let’s explore what that means by comparing kernel-level (platform) threads and user-level threads.&lt;/p&gt;
+&lt;hr/&gt;
+&lt;h1 id=&quot;overview-of-thread-types&quot;&gt;Overview of Thread Types&lt;/h1&gt;
+&lt;p&gt;Threads allow multiple tasks to execute concurrently within the same process. How these threads are managed depends on the layer of control:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Kernel-Level (Platform) Threads&lt;/strong&gt;: Managed directly by the operating system (OS).&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;User-Level Threads&lt;/strong&gt;: Managed by a user-space library or runtime, without OS involvement.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h1 id=&quot;comparison-of-kernel-level-threads-and-user-level-threads&quot;&gt;Comparison of Kernel-Level Threads and User-Level Threads&lt;/h1&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Feature&lt;/th&gt;
+&lt;th&gt;Platform Threads&lt;/th&gt;
+&lt;th&gt;User Threads&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;&lt;tr&gt;
+&lt;td&gt;Management&lt;/td&gt;
+&lt;td&gt;Managed by the operating system&lt;/td&gt;
+&lt;td&gt;A user-space library or runtime&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Mapping&lt;/td&gt;
+&lt;td&gt;Each thread in your program corresponds 1:1 to a thread in the OS&lt;/td&gt;
+&lt;td&gt;Many user threads multiplexed onto fewer kernel threads&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Parallelism&lt;/td&gt;
+&lt;td&gt;True paralleism with OS scheduling&lt;/td&gt;
+&lt;td&gt;Cooperative scheduling - often not parallel across cores&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Creation Speed&lt;/td&gt;
+&lt;td&gt;Slower, as each thread requires OS resources&lt;/td&gt;
+&lt;td&gt;Extremely fast (no OS call needed)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Resource Usage&lt;/td&gt;
+&lt;td&gt;Higher (stack, scheduling overhead)&lt;/td&gt;
+&lt;td&gt;Very light&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Blocking Behavior&lt;/td&gt;
+&lt;td&gt;Blocking system calls can suspend the entire OS thread&lt;/td&gt;
+&lt;td&gt;One blocked user thread does not necessarily block others (depending on runtime design)&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;&lt;/table&gt;
+&lt;h1 id=&quot;advantages--disadvantages&quot;&gt;Advantages / Disadvantages&lt;/h1&gt;
+&lt;h2 id=&quot;platform-kernel-level-threads&quot;&gt;Platform (Kernel-Level) Threads&lt;/h2&gt;
+&lt;h3 id=&quot;advantages&quot;&gt;Advantages&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;True hardware-level parallism&lt;/li&gt;
+&lt;li&gt;Direct access to OS scheduling and CPU cores&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&quot;disadvantages&quot;&gt;Disadvantages&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Higher overhead to create and switch context&lt;/li&gt;
+&lt;li&gt;Limited scalability - thousands of OS threads can quickly exhaust resources&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&quot;user-threads&quot;&gt;User Threads&lt;/h2&gt;
+&lt;h3 id=&quot;advantages-1&quot;&gt;Advantages&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Lightweight and quick to create&lt;/li&gt;
+&lt;li&gt;Efficient for large numbers of concurrent tasks&lt;/li&gt;
+&lt;li&gt;Portable across platforms&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&quot;disadvantages-1&quot;&gt;Disadvantages&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;Limited parallism - often single-core execution unless runtime manages multiplexing&lt;/li&gt;
+&lt;li&gt;Harder to integrate with blocking I/O or system calls&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h1 id=&quot;javas-evolution-from-platform-threads-to-virtual-threads&quot;&gt;Java&amp;#39;s Evolution: From Platform Threads to Virtual Threads&lt;/h1&gt;
+&lt;p&gt;Historically, Java threads were 1:1 mappings to OS (platform) threads. This meant creating thousands of concurrent tasks (eg, one thread per connection) was inefficient because each thread consumed a large stack and kernel resources.&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Project Loom&lt;/strong&gt; (introduced in Java 21) changed that. Virtual threads are user-level threads implemented by the JVM. They&amp;#39;re scheduled by the Java runtime onto a smaller pool of platform threads.&lt;/p&gt;
+&lt;p&gt;This gives use the best of both worlds:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;The simplicity of the familiar Thread API&lt;/li&gt;
+&lt;li&gt;The scalability of lightweight user threads&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h1 id=&quot;example-virtual-threads-in-action&quot;&gt;Example: Virtual Threads in Action&lt;/h1&gt;
+&lt;p&gt;Here&amp;#39;s a simple demonstration comparis traditional platform threads and virtual threads.&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;&lt;span class=&quot;hljs-keyword&quot;&gt;import&lt;/span&gt; java.util.concurrent.Executors;
+&lt;span class=&quot;hljs-keyword&quot;&gt;import&lt;/span&gt; java.util.stream.IntStream;
+
+&lt;span class=&quot;hljs-keyword&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;hljs-keyword&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;hljs-title class_&quot;&gt;VirtualThreadsDemo&lt;/span&gt; {
+    &lt;span class=&quot;hljs-keyword&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;hljs-keyword&quot;&gt;static&lt;/span&gt; &lt;span class=&quot;hljs-keyword&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;hljs-title function_&quot;&gt;main&lt;/span&gt;&lt;span class=&quot;hljs-params&quot;&gt;(String[] args)&lt;/span&gt; &lt;span class=&quot;hljs-keyword&quot;&gt;throws&lt;/span&gt; Exception {
+        &lt;span class=&quot;hljs-keyword&quot;&gt;try&lt;/span&gt; (&lt;span class=&quot;hljs-type&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;hljs-variable&quot;&gt;executor&lt;/span&gt; &lt;span class=&quot;hljs-operator&quot;&gt;=&lt;/span&gt; Executors.newVirtualThreadPerTaskExecutor()) {
+            IntStream.range(&lt;span class=&quot;hljs-number&quot;&gt;0&lt;/span&gt;, &lt;span class=&quot;hljs-number&quot;&gt;1000&lt;/span&gt;).forEach(i -&amp;gt;
+                executor.submit(() -&amp;gt; {
+                    Thread.sleep(&lt;span class=&quot;hljs-number&quot;&gt;100&lt;/span&gt;); &lt;span class=&quot;hljs-comment&quot;&gt;// Simulate blocking I/O&lt;/span&gt;
+                    System.out.println(&lt;span class=&quot;hljs-string&quot;&gt;&amp;quot;Task &amp;quot;&lt;/span&gt; + i + &lt;span class=&quot;hljs-string&quot;&gt;&amp;quot; running on &amp;quot;&lt;/span&gt; + Thread.currentThread());
+                    &lt;span class=&quot;hljs-keyword&quot;&gt;return&lt;/span&gt; i;
+                })
+            );
+        } &lt;span class=&quot;hljs-comment&quot;&gt;// Executor closes automatically&lt;/span&gt;
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;In older Java versions, creating 1000 threads like this would be expensive and could overwhelm the OS.
+With virtual threads, the JVM efficiently schedules them over a small number of kernel threads, giving you massive concurrency with minimal overhead.&lt;/p&gt;
+&lt;h1 id=&quot;choosing-the-right-threading-model&quot;&gt;Choosing the Right Threading Model&lt;/h1&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Scenario&lt;/th&gt;
+&lt;th&gt;Recommended Approach&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;&lt;tr&gt;
+&lt;td&gt;CPU-bound tasks&lt;/td&gt;
+&lt;td&gt;Platform (kernel-level) threads&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;I/O-bound tasks (many concurrent connections)&lt;/td&gt;
+&lt;td&gt;Virtual (user-level) threads&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Fine-grained concurrency, lightweight workloads&lt;/td&gt;
+&lt;td&gt;Virtual threads&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Low-Level system access, custom schedulers&lt;/td&gt;
+&lt;td&gt;Platform threads&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;&lt;/table&gt;
+&lt;h1 id=&quot;key-takeaways&quot;&gt;Key Takeaways&lt;/h1&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Platform threads&lt;/strong&gt; offer true parallelism but come with higher cost.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;User-level threads&lt;/strong&gt; (like Java virtual threads) are lightweight and scalable but rely on runtime scheduling.&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Java 21+ bridges the two worlds&lt;/strong&gt; by offering virtual threads that behave like normal &lt;code&gt;Threads&lt;/code&gt; but scale like coroutines.&lt;/li&gt;
+&lt;li&gt;Understanding how these thread models differ empowers us to design applications that are both efficient and maintainable in the era of high-concurrency systems.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h1 id=&quot;conclusion&quot;&gt;Conclusion&lt;/h1&gt;
+&lt;p&gt;As a Java developer, mastering concurrency isn&amp;#39;t just about using &lt;code&gt;synchronized&lt;/code&gt; or &lt;code&gt;ExecutorService&lt;/code&gt;. It&amp;#39;s about understanding what&amp;#39;s happending under the hood - how threads are scheduled, how resources are managed, and how new models like virtual threads reshape our approach to scalability.&lt;/p&gt;
+&lt;p&gt;Whether you&amp;#39;re optimizing backend performance or designing frameworks, knowing the difference between kernel-level and user-level threading will help us write code that&amp;#39;s both faster and more future-proof.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-yaml&quot;&gt;&lt;span class=&quot;hljs-meta&quot;&gt;---&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;title:&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Kernel-Level&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Threads&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;vs&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;User-Level&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Threads&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;(and&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Why&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;It&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Matters&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;in&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Modern&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Java)&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;description:&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;What&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;is&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;the&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;difference&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;between&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;kernel-level&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;threads&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;and&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;user-level&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;threads?&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;date:&lt;/span&gt; &lt;span class=&quot;hljs-number&quot;&gt;2025-11-03&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;keywords:&lt;/span&gt; [&lt;span class=&quot;hljs-string&quot;&gt;java&lt;/span&gt;,&lt;span class=&quot;hljs-string&quot;&gt;concurrency&lt;/span&gt;]
+&lt;span class=&quot;hljs-meta&quot;&gt;---&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+</content>
+</entry>
 <entry>
 <title>Healthy vs Non-Healthy Garbage Collection Behavior In The JVM</title>
 <id>urn:md2blog:Build%20Log:Healthy%20vs%20Non-Healthy%20Garbage%20Collection%20Behavior%20In%20The%20JVM</id>
