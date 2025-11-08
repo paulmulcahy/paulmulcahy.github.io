@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Not All Java Concurrency Bugs Throw ConcurrentModificationException</title>
+<meta name="description" content="Understanding why ConcurrentModificationException isn’t a safety net and how concurrent access can silently break Java collections" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<link rel="stylesheet" href="../../css/style.css" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "Not All Java Concurrency Bugs Throw ConcurrentModificationException",
+  "abstract": "Understanding why ConcurrentModificationException isn’t a safety net and how concurrent access can silently break Java collections",
+  "keywords": "concurrency",
+  "datePublished": "2025-11-07"
+}
+</script>
+</head>
+<body>
+<header>
+<h1><a href="../../index.html">Build Log</a></h1>
+<p>Tracking the process of building — systems, skills, and ideas that evolve over time.</p>
+
+<nav>
+<strong>Topics:&nbsp;</strong>
+<ul>
+<li><a href="../../posts/concurrency/index.html">concurrency</a></li>
+</ul>
+</nav>
+</header>
+<main>
+<article>
+<header>
+<h1><a href="../../posts/concurrency/not-all-java-concurrency-bugs-throw-concurrentmodificationexception.html">Not All Java Concurrency Bugs Throw ConcurrentModificationException</a></h1>
+<p><time datetime="2025-11-07">November 7, 2025</time></p>
+</header>
+<p>As Java developers, we often rely on collections like ArrayList and HashMap in our day-to-day coding. These collections are incredibly convenient, but there’s a subtle trap many intermediate developers encounter: <strong>concurrent access to non-thread-safe collections</strong>.</p>
+<blockquote>
+<p>&quot;If I access a non-thread-safe collection concurrently, Java will always throw a ConcurrentModificationException (CME).&quot;</p>
+</blockquote>
+<p>This isn’t true—and understanding why is a mark of a more senior developer.</p>
+<hr>
+<h1 id="the-reality">The Reality</h1>
+<p>ConcurrentModificationException is <strong>not a catch-all for concurrency issues in collections</strong>. It is a <strong>fail-fast mechanism</strong> designed to detect some, but not all, unsafe modifications during iteration.</p>
+<p>Fail-fast iterators are a convenience, not a safety net. Here’s what that means:</p>
+<h2 id="1-iterating-while-modifying">1. Iterating while modifying</h2>
+<pre><code>List&lt;Integer&gt; <span class="hljs-built_in">list</span> = <span class="hljs-keyword">new</span> ArrayList&lt;&gt;(<span class="hljs-module-access"><span class="hljs-module"><span class="hljs-identifier">Arrays</span>.</span></span><span class="hljs-keyword">as</span><span class="hljs-constructor">List(1, 2, 3)</span>);
+<span class="hljs-keyword">for</span> (Integer i : <span class="hljs-built_in">list</span>) {
+    <span class="hljs-built_in">list</span>.add(<span class="hljs-number">4</span>); <span class="hljs-comment">// Might throw ConcurrentModificationException</span>
+}
+</code></pre>
+<p>This will likely throw CME because the iterator detects the modification.</p>
+<h2 id="2-concurrent-writes-without-iteration">2. Concurrent writes without iteration</h2>
+<pre><code>List&lt;Integer&gt; list <span class="hljs-operator">=</span> new ArrayList&lt;&gt;()<span class="hljs-comment">;</span>
+Thread t1 <span class="hljs-operator">=</span> () -&gt; list.add(<span class="hljs-number">1</span>)<span class="hljs-comment">;</span>
+Thread t2 <span class="hljs-operator">=</span> () -&gt; list.add(<span class="hljs-number">2</span>)<span class="hljs-comment">;</span>
+
+t1.start()<span class="hljs-comment">;</span>
+t2.start()<span class="hljs-comment">;</span>
+</code></pre>
+<p>Here, <strong>no iteration is happening</strong>, so <strong>no CME occurs</strong>, but the list may end up in a corrupted state or have lost updates. The JVM gives <strong>no warning</strong>, which can lead to subtle, hard-to-diagnose bugs.</p>
+<hr>
+<h1 id="key-takewaways">Key Takewaways</h1>
+<ul>
+<li><p><strong>CME is best-effort detection</strong>, not a guarantee.</p>
+</li>
+<li><p><strong>Non-thread-safe collections are vulnerable</strong> to silent corruption, lost updates, and unpredictable behavior under concurrency.</p>
+</li>
+<li><p>To safely handle concurrent access, use:</p>
+<ul>
+<li>Collections.synchronizedList(...) or Collections.synchronizedMap(...)</li>
+<li>Concurrent collections like ConcurrentHashMap, CopyOnWriteArrayList, or ConcurrentLinkedQueue</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h1 id="why-this-matters">Why This Matters</h1>
+<p>Understanding the difference between fail-fast exceptions and real concurrency safety is a key step toward writing robust, maintainable Java code. Senior developers not only write code that works—they anticipate subtle failure modes and choose the right tools to prevent them.</p>
+<hr>
+<p><strong>Pro Tip:</strong> Don’t rely on ConcurrentModificationException to tell you your code is thread-safe. Treat it as a helpful signal, not a safety net.</p>
+<pre><code class="language-yaml"><span class="hljs-meta">---</span>
+<span class="hljs-attr">title:</span> <span class="hljs-string">Not</span> <span class="hljs-string">All</span> <span class="hljs-string">Java</span> <span class="hljs-string">Concurrency</span> <span class="hljs-string">Bugs</span> <span class="hljs-string">Throw</span> <span class="hljs-string">ConcurrentModificationException</span>
+<span class="hljs-attr">description:</span> <span class="hljs-string">Understanding</span> <span class="hljs-string">why</span> <span class="hljs-string">ConcurrentModificationException</span> <span class="hljs-string">isn’t</span> <span class="hljs-string">a</span> <span class="hljs-string">safety</span> <span class="hljs-string">net</span> <span class="hljs-string">and</span> <span class="hljs-string">how</span> <span class="hljs-string">concurrent</span> <span class="hljs-string">access</span> <span class="hljs-string">can</span> <span class="hljs-string">silently</span> <span class="hljs-string">break</span> <span class="hljs-string">Java</span> <span class="hljs-string">collections</span>
+<span class="hljs-attr">date:</span> <span class="hljs-number">2025-11-07</span>
+<span class="hljs-attr">keywords:</span> [<span class="hljs-string">java</span>,<span class="hljs-string">concurrency</span>]
+<span class="hljs-meta">---</span>
+</code></pre>
+
+<footer>
+<p>&crarr; <a href="../../index.html">Back to home</a></p>
+</footer>
+</article>
+</main>
+<footer>
+<p>All opinions and reflections here are my own and not those of my employer.</p>
+</footer>
+</body>
+</html>

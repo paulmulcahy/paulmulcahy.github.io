@@ -6,8 +6,67 @@
 <author>
 <name>Build Log</name>
 </author>
-<updated>2025-11-04T04:34:56.174Z</updated>
+<updated>2025-11-08T05:16:41.428Z</updated>
 
+<entry>
+<title>Not All Java Concurrency Bugs Throw ConcurrentModificationException</title>
+<id>urn:md2blog:Build%20Log:Not%20All%20Java%20Concurrency%20Bugs%20Throw%20ConcurrentModificationException</id>
+<link rel="alternate" href="posts/concurrency/not-all-java-concurrency-bugs-throw-concurrentmodificationexception.html"/>
+<updated>2025-11-07T00:00:00.000Z</updated>
+<summary type="text">Understanding why ConcurrentModificationException isn’t a safety net and how concurrent access can silently break Java collections</summary>
+<content type="html">&lt;p&gt;As Java developers, we often rely on collections like ArrayList and HashMap in our day-to-day coding. These collections are incredibly convenient, but there’s a subtle trap many intermediate developers encounter: &lt;strong&gt;concurrent access to non-thread-safe collections&lt;/strong&gt;.&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&amp;quot;If I access a non-thread-safe collection concurrently, Java will always throw a ConcurrentModificationException (CME).&amp;quot;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;This isn’t true—and understanding why is a mark of a more senior developer.&lt;/p&gt;
+&lt;hr/&gt;
+&lt;h1 id=&quot;the-reality&quot;&gt;The Reality&lt;/h1&gt;
+&lt;p&gt;ConcurrentModificationException is &lt;strong&gt;not a catch-all for concurrency issues in collections&lt;/strong&gt;. It is a &lt;strong&gt;fail-fast mechanism&lt;/strong&gt; designed to detect some, but not all, unsafe modifications during iteration.&lt;/p&gt;
+&lt;p&gt;Fail-fast iterators are a convenience, not a safety net. Here’s what that means:&lt;/p&gt;
+&lt;h2 id=&quot;1-iterating-while-modifying&quot;&gt;1. Iterating while modifying&lt;/h2&gt;
+&lt;pre&gt;&lt;code&gt;List&amp;lt;Integer&amp;gt; &lt;span class=&quot;hljs-built_in&quot;&gt;list&lt;/span&gt; = &lt;span class=&quot;hljs-keyword&quot;&gt;new&lt;/span&gt; ArrayList&amp;lt;&amp;gt;(&lt;span class=&quot;hljs-module-access&quot;&gt;&lt;span class=&quot;hljs-module&quot;&gt;&lt;span class=&quot;hljs-identifier&quot;&gt;Arrays&lt;/span&gt;.&lt;/span&gt;&lt;/span&gt;&lt;span class=&quot;hljs-keyword&quot;&gt;as&lt;/span&gt;&lt;span class=&quot;hljs-constructor&quot;&gt;List(1, 2, 3)&lt;/span&gt;);
+&lt;span class=&quot;hljs-keyword&quot;&gt;for&lt;/span&gt; (Integer i : &lt;span class=&quot;hljs-built_in&quot;&gt;list&lt;/span&gt;) {
+    &lt;span class=&quot;hljs-built_in&quot;&gt;list&lt;/span&gt;.add(&lt;span class=&quot;hljs-number&quot;&gt;4&lt;/span&gt;); &lt;span class=&quot;hljs-comment&quot;&gt;// Might throw ConcurrentModificationException&lt;/span&gt;
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;This will likely throw CME because the iterator detects the modification.&lt;/p&gt;
+&lt;h2 id=&quot;2-concurrent-writes-without-iteration&quot;&gt;2. Concurrent writes without iteration&lt;/h2&gt;
+&lt;pre&gt;&lt;code&gt;List&amp;lt;Integer&amp;gt; list &lt;span class=&quot;hljs-operator&quot;&gt;=&lt;/span&gt; new ArrayList&amp;lt;&amp;gt;()&lt;span class=&quot;hljs-comment&quot;&gt;;&lt;/span&gt;
+Thread t1 &lt;span class=&quot;hljs-operator&quot;&gt;=&lt;/span&gt; () -&amp;gt; list.add(&lt;span class=&quot;hljs-number&quot;&gt;1&lt;/span&gt;)&lt;span class=&quot;hljs-comment&quot;&gt;;&lt;/span&gt;
+Thread t2 &lt;span class=&quot;hljs-operator&quot;&gt;=&lt;/span&gt; () -&amp;gt; list.add(&lt;span class=&quot;hljs-number&quot;&gt;2&lt;/span&gt;)&lt;span class=&quot;hljs-comment&quot;&gt;;&lt;/span&gt;
+
+t1.start()&lt;span class=&quot;hljs-comment&quot;&gt;;&lt;/span&gt;
+t2.start()&lt;span class=&quot;hljs-comment&quot;&gt;;&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Here, &lt;strong&gt;no iteration is happening&lt;/strong&gt;, so &lt;strong&gt;no CME occurs&lt;/strong&gt;, but the list may end up in a corrupted state or have lost updates. The JVM gives &lt;strong&gt;no warning&lt;/strong&gt;, which can lead to subtle, hard-to-diagnose bugs.&lt;/p&gt;
+&lt;hr/&gt;
+&lt;h1 id=&quot;key-takewaways&quot;&gt;Key Takewaways&lt;/h1&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;CME is best-effort detection&lt;/strong&gt;, not a guarantee.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;&lt;strong&gt;Non-thread-safe collections are vulnerable&lt;/strong&gt; to silent corruption, lost updates, and unpredictable behavior under concurrency.&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;&lt;p&gt;To safely handle concurrent access, use:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Collections.synchronizedList(...) or Collections.synchronizedMap(...)&lt;/li&gt;
+&lt;li&gt;Concurrent collections like ConcurrentHashMap, CopyOnWriteArrayList, or ConcurrentLinkedQueue&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr/&gt;
+&lt;h1 id=&quot;why-this-matters&quot;&gt;Why This Matters&lt;/h1&gt;
+&lt;p&gt;Understanding the difference between fail-fast exceptions and real concurrency safety is a key step toward writing robust, maintainable Java code. Senior developers not only write code that works—they anticipate subtle failure modes and choose the right tools to prevent them.&lt;/p&gt;
+&lt;hr/&gt;
+&lt;p&gt;&lt;strong&gt;Pro Tip:&lt;/strong&gt; Don’t rely on ConcurrentModificationException to tell you your code is thread-safe. Treat it as a helpful signal, not a safety net.&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-yaml&quot;&gt;&lt;span class=&quot;hljs-meta&quot;&gt;---&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;title:&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Not&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;All&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Java&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Concurrency&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Bugs&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Throw&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;ConcurrentModificationException&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;description:&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Understanding&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;why&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;ConcurrentModificationException&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;isn’t&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;a&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;safety&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;net&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;and&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;how&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;concurrent&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;access&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;can&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;silently&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;break&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;Java&lt;/span&gt; &lt;span class=&quot;hljs-string&quot;&gt;collections&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;date:&lt;/span&gt; &lt;span class=&quot;hljs-number&quot;&gt;2025-11-07&lt;/span&gt;
+&lt;span class=&quot;hljs-attr&quot;&gt;keywords:&lt;/span&gt; [&lt;span class=&quot;hljs-string&quot;&gt;java&lt;/span&gt;,&lt;span class=&quot;hljs-string&quot;&gt;concurrency&lt;/span&gt;]
+&lt;span class=&quot;hljs-meta&quot;&gt;---&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+</content>
+</entry>
 <entry>
 <title>Kernel-Level Threads vs User-Level Threads (and Why It Matters in Modern Java)</title>
 <id>urn:md2blog:Build%20Log:Kernel-Level%20Threads%20vs%20User-Level%20Threads%20(and%20Why%20It%20Matters%20in%20Modern%20Java)</id>
